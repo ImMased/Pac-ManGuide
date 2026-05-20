@@ -1162,5 +1162,175 @@
     });
   });
 </script>
+
+<style>
+  * { cursor: none !important; }
+
+  #custom-cursor {
+    position: fixed;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: white;
+    pointer-events: none;
+    z-index: 99999;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 8px 3px rgba(255,255,255,0.6);
+  }
+
+  .pac-trail-dot {
+    position: fixed;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: white;
+    pointer-events: none;
+    z-index: 99997;
+    transform: translate(-50%, -50%);
+  }
+
+  .mini-pacman {
+    position: fixed;
+    pointer-events: none;
+    z-index: 99998;
+    transform: translate(-50%, -50%);
+  }
+</style>
+
+<script>
+(function () {
+  const cursor = document.createElement('div');
+  cursor.id = 'custom-cursor';
+  document.body.appendChild(cursor);
+
+  const miniPac = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  miniPac.classList.add('mini-pacman');
+  miniPac.setAttribute('width', '24');
+  miniPac.setAttribute('height', '24');
+  miniPac.setAttribute('viewBox', '0 0 100 100');
+  miniPac.innerHTML = `<path id="pac-mouth" d="M50,50 L95,20 A48,48 0 1,0 95,80 Z" fill="#FFE000"/>`;
+  document.body.appendChild(miniPac);
+
+  const mouthPath = miniPac.querySelector('#pac-mouth');
+
+  const dots = [];
+  let pacX = -200, pacY = -200;
+  let targetIndex = 0;
+  let lastSpawnX = null, lastSpawnY = null;
+  let mouthOpen = true;
+  let frame = 0;
+  let totalDotsEaten = 0;
+  const BASE_SPEED = 7.5;
+  const DOT_SPACING = 24;
+
+  // Kursor ikut mouse
+  document.addEventListener('mousemove', (e) => {
+    const mx = e.clientX, my = e.clientY;
+
+    cursor.style.left = mx + 'px';
+    cursor.style.top  = my + 'px';
+
+    if (lastSpawnX === null) {
+      lastSpawnX = mx;
+      lastSpawnY = my;
+      pacX = mx;
+      pacY = my;
+    }
+
+    const dx = mx - lastSpawnX;
+    const dy = my - lastSpawnY;
+    if (Math.sqrt(dx * dx + dy * dy) >= DOT_SPACING) {
+      spawnDot(mx, my);
+      lastSpawnX = mx;
+      lastSpawnY = my;
+    }
+  });
+
+  function spawnDot(x, y) {
+    const el = document.createElement('div');
+    el.classList.add('pac-trail-dot');
+    el.style.left    = x + 'px';
+    el.style.top     = y + 'px';
+    document.body.appendChild(el);
+    dots.push({ el, x, y });
+  }
+
+  function eatDot(dot) {
+    // Langsung hilang, tanpa transisi
+    dot.el.remove();
+  }
+
+  function animateMouth() {
+    mouthOpen = !mouthOpen;
+    mouthPath.setAttribute('d', mouthOpen
+      ? 'M50,50 L95,20 A48,48 0 1,0 95,80 Z'
+      : 'M50,50 L95,38 A48,48 0 1,0 95,62 Z'
+    );
+  }
+
+  function getPacSpeed() {
+    // Setiap kelipatan 10 dot dimakan, tambah 0.3 kecepatan
+    const bonus = Math.floor(totalDotsEaten / 10) * 0.3;
+    return BASE_SPEED + bonus;
+  }
+
+  function loop() {
+    frame++;
+    if (frame % 10 === 0) animateMouth();
+
+    const speed = getPacSpeed();
+    const dotsRemaining = dots.length - targetIndex;
+
+    if (targetIndex < dots.length) {
+      const target = dots[targetIndex];
+      const dx = target.x - pacX;
+      const dy = target.y - pacY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist <= speed) {
+        pacX = target.x;
+        pacY = target.y;
+        eatDot(target);
+        totalDotsEaten++;
+        targetIndex++;
+      } else {
+        const ratio = speed / dist;
+        pacX += dx * ratio;
+        pacY += dy * ratio;
+
+        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+        miniPac.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+      }
+    } else {
+      // Semua dot habis dimakan — Mini Pac-Man menutupi kursor
+      const cx = parseFloat(cursor.style.left) || pacX;
+      const cy = parseFloat(cursor.style.top)  || pacY;
+      pacX = cx;
+      pacY = cy;
+      // Sembunyikan kursor Power Pellet
+      cursor.style.opacity = '0';
+    }
+
+    // Tampilkan kembali Power Pellet kalau ada dot baru
+    if (dotsRemaining > 0) {
+      cursor.style.opacity = '1';
+    }
+
+    miniPac.style.left = pacX + 'px';
+    miniPac.style.top  = pacY + 'px';
+
+    // Bersihkan memori
+    if (targetIndex > 100) {
+      dots.splice(0, targetIndex);
+      targetIndex = 0;
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  loop();
+})();
+</script>
+  
 </body>
 </html>
